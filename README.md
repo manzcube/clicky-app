@@ -39,24 +39,49 @@ just **⌘⇧Space** (Ctrl+Shift+Space on Windows and Linux) when you want it.
 
 ## Install
 
-### Download a build
+### Download
 
-Grab the file for your machine from
-[Releases](https://github.com/YOURNAME/clicky/releases):
+Grab the installer for your machine from
+[Releases](https://github.com/manzcube/clicky-app/releases/latest):
 
 | Platform | File |
 |---|---|
 | macOS, Apple Silicon | `clicky_x.y.z_aarch64.dmg` |
 | macOS, Intel | `clicky_x.y.z_x64.dmg` |
-| Windows | `clicky_x.y.z_x64-setup.exe` |
-| Linux | `clicky_x.y.z_amd64.AppImage` |
+| Windows | `clicky_x.y.z_x64-setup.exe` (or the `.msi`) |
+| Linux | `clicky_x.y.z_amd64.AppImage` (or the `.deb`) |
 
-macOS will say the app is from an unidentified developer unless you've set up
-signing. Right-click the app → **Open** → **Open** clears it once and for all.
+clicky isn't code-signed yet, so both macOS and Windows will warn you the
+*first* time you open it. This is normal for an unsigned app, not a sign
+anything's wrong — here's how to get past it:
 
-### Then install a model
+**macOS** says the app "cannot be verified" / is from an unidentified
+developer. Right-click (Control-click) `clicky.app` → **Open** → **Open**
+again in the dialog that appears. You only need to do this once per download.
 
-clicky needs Ollama running with one model pulled.
+**Windows** SmartScreen says "Windows protected your PC." Click **More info**,
+then **Run anyway**.
+
+### First run — two permissions to grant
+
+clicky lives in your menu bar / system tray, not your dock or taskbar. The
+first time you run it, two things need your go-ahead:
+
+**1. Accessibility (macOS only).** clicky reads highlighted text via the
+clipboard, which macOS gates behind this permission — without it, every
+selection comes back empty. System Settings → Privacy & Security →
+Accessibility → turn on clicky. clicky isn't signed with a stable identity
+yet, so a rebuilt or redownloaded copy looks like a "new" app to macOS and
+you'll need to flip this on again for it — remove the old `clicky` entry
+first if one's already listed, greyed out.
+
+**2. Ollama.** If it's not already running, clicky's panel shows a setup card
+with a **Download Ollama** button that opens the official installer for your
+OS — no terminal needed. Once Ollama's running, clicky pulls the model
+automatically (`gemma3:4b` by default, about 3GB, one-time). Just wait for the
+progress bar.
+
+If you'd rather do it yourself from a terminal:
 
 ```bash
 # macOS / Linux
@@ -66,11 +91,8 @@ curl -fsSL https://ollama.com/install.sh | sh
 ollama pull gemma3:4b
 ```
 
-`gemma3:4b` is the default — about 3GB, good at translation, fast enough to
-feel instant. Any model you've pulled works; set it in the settings file.
-
-**Do this too.** It keeps the model in RAM between uses, which is the
-difference between clicky feeling instant and feeling broken:
+**Worth doing either way** — it keeps the model loaded in RAM between uses,
+which is the difference between clicky feeling instant and feeling broken:
 
 ```bash
 # macOS / Linux — add to ~/.zshrc or ~/.bashrc
@@ -78,15 +100,6 @@ export OLLAMA_KEEP_ALIVE=30m
 # Windows PowerShell
 setx OLLAMA_KEEP_ALIVE 30m
 ```
-
-### First run
-
-clicky lives in your menu bar / system tray, not your dock.
-
-**macOS will ask for Accessibility permission, and clicky does nothing useful
-without it.** System Settings → Privacy & Security → Accessibility → turn on
-clicky. It needs this to read what you've highlighted in other apps. If you
-skip it, every selection comes back empty.
 
 ---
 
@@ -128,8 +141,8 @@ CLICKY_MODEL=qwen3:4b clicky
 ## Build it yourself
 
 ```bash
-git clone https://github.com/YOURNAME/clicky.git
-cd clicky
+git clone https://github.com/manzcube/clicky-app.git
+cd clicky-app
 cargo install tauri-cli --version "^2"    # once
 
 cd src-tauri && cargo tauri dev           # run it
