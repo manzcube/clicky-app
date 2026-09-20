@@ -59,6 +59,38 @@ async fn list_models(store: State<'_, Store>) -> Result<Vec<String>, String> {
     Ok(model::list(&host).await)
 }
 
+#[derive(serde::Serialize)]
+struct OllamaStatus {
+    running: bool,
+    has_model: bool,
+}
+
+/// Drives the first-run setup card: a user with nothing installed gets a
+/// "download Ollama" prompt instead of a silent, confusing failure the first
+/// time they highlight text.
+#[tauri::command]
+async fn check_ollama(store: State<'_, Store>) -> Result<OllamaStatus, String> {
+    let cfg = store.get();
+    let running = model::ping(&cfg.host).await;
+    let has_model = running && model::has_model(&cfg.host, &cfg.model).await;
+    Ok(OllamaStatus { running, has_model })
+}
+
+#[tauri::command]
+fn open_ollama_download(app: AppHandle) {
+    use tauri_plugin_opener::OpenerExt;
+    let _ = app
+        .opener()
+        .open_url("https://ollama.com/download", None::<&str>);
+}
+
+#[tauri::command]
+async fn pull_model(app: AppHandle, store: State<'_, Store>) -> Result<(), String> {
+    let cfg = store.get();
+    tauri::async_runtime::spawn(model::pull(app, cfg.host, cfg.model));
+    Ok(())
+}
+
 #[tauri::command]
 fn held_text(held: State<'_, Held>) -> String {
     held.0.lock().unwrap().clone()
@@ -207,7 +239,10 @@ fn main() {
             dismiss_panel,
             replace_selection,
             bead_clickthrough,
-            quit
+            quit,
+            check_ollama,
+            open_ollama_download,
+            pull_model
         ])
         .setup(|app| {
             let handle = app.handle().clone();

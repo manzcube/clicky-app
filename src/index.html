@@ -130,6 +130,25 @@
   .err { color: #FF9A8B; font-size: 12.5px; line-height: 1.5; }
   .err code { color: var(--mark); font-size: 12px; }
 
+  /* First-run setup: shown instead of .ready until Ollama answers and the
+     model is pulled. */
+  .setup { display: none; padding: 8px 4px 4px; text-align: center; }
+  .ready { display: block; }
+  body.setup-mode .setup { display: block; }
+  body.setup-mode .ready { display: none; }
+  .setup-title { font-size: 14px; font-weight: 600; margin: 4px 0 6px; }
+  .setup-body { font-size: 12.5px; line-height: 1.55; color: var(--dim); margin: 0 0 14px; }
+  .act.primary {
+    color: #14161B; background: var(--mark); font-weight: 600;
+    padding: 8px 18px; font-size: 12.5px;
+  }
+  .act.primary:disabled { opacity: .55; cursor: default; }
+  .progress {
+    height: 6px; border-radius: 3px; background: var(--raised);
+    overflow: hidden; margin-top: 6px;
+  }
+  .progress .bar { height: 100%; width: 0%; background: var(--mark); transition: width .25s ease; }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
   }
@@ -138,32 +157,48 @@
 <body>
 
 <div class="panel">
-  <div class="source" id="source"></div>
-
-  <div class="chips" role="group" aria-label="Actions">
-    <button class="chip" data-mode="translate" aria-pressed="false">Translate</button>
-    <button class="chip" data-mode="reply"     aria-pressed="false">Reply</button>
-    <button class="chip" data-mode="polish"    aria-pressed="false">Polish</button>
-    <button class="chip" data-mode="explain"   aria-pressed="false">Explain</button>
+  <!-- Shown instead of everything below until Ollama is actually reachable
+       and the configured model is pulled. A user with nothing installed
+       yet should get a next step, not a silent, confusing failure the
+       first time they highlight text. -->
+  <div class="setup" id="setup">
+    <p class="setup-title" id="setupTitle">clicky needs Ollama</p>
+    <p class="setup-body" id="setupBody">
+      Ollama runs the model on your machine — nothing you highlight ever
+      leaves your computer.
+    </p>
+    <button class="act primary" id="setupAction">Download Ollama</button>
+    <div class="progress" id="setupProgress" hidden><div class="bar" id="setupBar"></div></div>
   </div>
 
-  <div class="ask">
-    <span class="bead" id="bead"></span>
-    <input id="ask" autocomplete="off" spellcheck="false" placeholder="Ask anything about this…" />
-    <select id="lang" hidden aria-label="Translate into">
-      <option>English</option><option>Spanish</option><option>Catalan</option>
-      <option>German</option><option>French</option><option>Italian</option>
-      <option>Portuguese</option><option>Dutch</option><option>Japanese</option>
-      <option>Chinese</option><option>Arabic</option>
-    </select>
-  </div>
+  <div class="ready" id="ready">
+    <div class="source" id="source"></div>
 
-  <div class="out" id="out"></div>
+    <div class="chips" role="group" aria-label="Actions">
+      <button class="chip" data-mode="translate" aria-pressed="false">Translate</button>
+      <button class="chip" data-mode="reply"     aria-pressed="false">Reply</button>
+      <button class="chip" data-mode="polish"    aria-pressed="false">Polish</button>
+      <button class="chip" data-mode="explain"   aria-pressed="false">Explain</button>
+    </div>
 
-  <div class="foot" id="foot">
-    <span class="model" id="model"></span>
-    <button class="act" id="copy">Copy</button>
-    <button class="act" id="replace">Replace selection</button>
+    <div class="ask">
+      <span class="bead" id="bead"></span>
+      <input id="ask" autocomplete="off" spellcheck="false" placeholder="Ask anything about this…" />
+      <select id="lang" hidden aria-label="Translate into">
+        <option>English</option><option>Spanish</option><option>Catalan</option>
+        <option>German</option><option>French</option><option>Italian</option>
+        <option>Portuguese</option><option>Dutch</option><option>Japanese</option>
+        <option>Chinese</option><option>Arabic</option>
+      </select>
+    </div>
+
+    <div class="out" id="out"></div>
+
+    <div class="foot" id="foot">
+      <span class="model" id="model"></span>
+      <button class="act" id="copy">Copy</button>
+      <button class="act" id="replace">Replace selection</button>
+    </div>
   </div>
 </div>
 
@@ -176,6 +211,8 @@ const $ = (id) => document.getElementById(id);
 const els = {
   source: $("source"), out: $("out"), foot: $("foot"),
   ask: $("ask"), bead: $("bead"), lang: $("lang"), model: $("model"),
+  setupTitle: $("setupTitle"), setupBody: $("setupBody"),
+  setupAction: $("setupAction"), setupProgress: $("setupProgress"), setupBar: $("setupBar"),
 };
 
 let selection = "";
@@ -368,6 +405,64 @@ function flash(btn, word) {
   setTimeout(() => (btn.textContent = old), 1100);
 }
 
+/* ---------------------------------------------------------------
+   First-run setup. A user with nothing installed yet should land on a
+   next step, not a silent "Ollama isn't answering" the first time they
+   highlight text. Checked once per session — once Ollama's confirmed
+   ready we don't nag about it again.
+   --------------------------------------------------------------- */
+let ollamaReady = false;
+let pollTimer = null;
+
+async function checkOllama() {
+  if (!invoke || ollamaReady) return;
+  const s = await invoke("check_ollama");
+  if (!s.running) showSetup("download");
+  else if (!s.has_model) showSetup("pull");
+  else {
+    ollamaReady = true;
+    document.body.classList.remove("setup-mode");
+  }
+}
+
+function showSetup(stage) {
+  document.body.classList.add("setup-mode");
+  clearInterval(pollTimer);
+
+  if (stage === "download") {
+    els.setupTitle.textContent = "clicky needs Ollama";
+    els.setupBody.textContent =
+      "Ollama runs the model on your machine — nothing you highlight ever leaves your computer.";
+    els.setupAction.hidden = false;
+    els.setupAction.disabled = false;
+    els.setupAction.textContent = "Download Ollama";
+    els.setupProgress.hidden = true;
+    els.setupAction.onclick = async () => {
+      await invoke("open_ollama_download");
+      els.setupAction.disabled = true;
+      els.setupAction.textContent = "Waiting for Ollama to start…";
+      // Poll the raw status directly rather than through checkOllama/showSetup —
+      // re-entering showSetup("download") on every still-not-ready tick would
+      // clear this very interval and wipe the "waiting" button state.
+      pollTimer = setInterval(async () => {
+        const s = await invoke("check_ollama");
+        if (s.running) {
+          clearInterval(pollTimer);
+          checkOllama();
+        }
+      }, 2000);
+    };
+  } else if (stage === "pull") {
+    els.setupTitle.textContent = "Downloading the model";
+    els.setupBody.textContent =
+      `Pulling ${settings?.model || "the model"} — this only happens once.`;
+    els.setupAction.hidden = true;
+    els.setupProgress.hidden = false;
+    els.setupBar.style.width = "0%";
+    invoke("pull_model");
+  }
+}
+
 /* ---- app mode ---- */
 if (T) {
   listen("token", (e) => { els.out.textContent += e.payload; els.out.scrollTop = 1e6; });
@@ -382,10 +477,26 @@ if (T) {
     else cancelAutoClose();
   });
 
+  listen("pull-progress", (e) => {
+    const { completed, total } = e.payload;
+    if (total) els.setupBar.style.width = `${Math.min(100, (completed / total) * 100)}%`;
+  });
+  listen("pull-done", checkOllama);
+  listen("pull-error", (e) => {
+    els.setupTitle.textContent = "Couldn't download the model";
+    els.setupBody.textContent = String(e.payload);
+    els.setupProgress.hidden = true;
+    els.setupAction.hidden = false;
+    els.setupAction.disabled = false;
+    els.setupAction.textContent = "Try again";
+    els.setupAction.onclick = () => showSetup("pull");
+  });
+
   invoke("get_settings").then((s) => {
     settings = s;
     els.model.textContent = s.model;
     els.lang.value = s.target_language;
+    checkOllama();
   });
   invoke("held_text").then(load);
 }

@@ -111,3 +111,74 @@ pub async fn list(host: &str) -> Vec<String> {
         })
         .unwrap_or_default()
 }
+
+/// Is Ollama even running? Used to drive the first-run setup card — a user
+/// with nothing installed yet gets a "download Ollama" prompt instead of a
+/// silent, confusing failure the first time they highlight text.
+pub async fn ping(host: &str) -> bool {
+    reqwest::Client::new()
+        .get(format!("{host}/api/tags"))
+        .timeout(std::time::Duration::from_secs(2))
+        .send()
+        .await
+        .is_ok()
+}
+
+pub async fn has_model(host: &str, model: &str) -> bool {
+    list(host).await.iter().any(|m| m == model)
+}
+
+/// Pulls a model, streaming progress the same way `stream()` streams tokens.
+pub async fn pull(app: AppHandle, host: String, model: String) {
+    let url = format!("{host}/api/pull");
+    let body = json!({ "model": model, "stream": true });
+
+    let resp = match reqwest::Client::new().post(&url).json(&body).send().await {
+        Ok(r) => r,
+        Err(e) => {
+            let _ = app.emit("pull-error", e.to_string());
+            return;
+        }
+    };
+    if !resp.status().is_success() {
+        let _ = app.emit("pull-error", format!("Ollama answered {}", resp.status()));
+        return;
+    }
+
+    let mut stream = resp.bytes_stream();
+    let mut buf = String::new();
+
+    while let Some(chunk) = stream.next().await {
+        let Ok(bytes) = chunk else { break };
+        buf.push_str(&String::from_utf8_lossy(&bytes));
+
+        while let Some(nl) = buf.find('\n') {
+            let line: String = buf.drain(..=nl).collect();
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            let Ok(v) = serde_json::from_str::<Value>(line) else {
+                continue;
+            };
+
+            if let Some(err) = v["error"].as_str() {
+                let _ = app.emit("pull-error", err.to_string());
+                return;
+            }
+            let _ = app.emit(
+                "pull-progress",
+                json!({
+                    "status": v["status"].as_str().unwrap_or(""),
+                    "completed": v["completed"].as_u64(),
+                    "total": v["total"].as_u64(),
+                }),
+            );
+            if v["status"].as_str() == Some("success") {
+                let _ = app.emit("pull-done", ());
+                return;
+            }
+        }
+    }
+    let _ = app.emit("pull-done", ());
+}
