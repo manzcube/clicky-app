@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>clicky</title>
+<style>
+  :root {
+    --panel:    #16191F;
+    --raised:   #1E222A;
+    --edge:     rgba(255,255,255,.08);
+    --edge-lit: rgba(255,255,255,.16);
+    --text:     #E9EAEE;
+    --dim:      #878D99;
+    --faint:    #5D636E;
+    --mark:     #FFD429;
+    --mark-dim: rgba(255,212,41,.18);
+    --ui: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
+          Inter, Roboto, "Helvetica Neue", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; background: transparent;
+    font-family: var(--ui); color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden; user-select: none; cursor: default;
+  }
+
+  body.preview {
+    background: radial-gradient(1200px 700px at 20% 0%, #2A3140 0%, #14171D 60%, #0B0D11 100%);
+    display: grid; place-items: center; min-height: 100vh; padding: 40px 16px; overflow: auto;
+  }
+  body.preview .panel { box-shadow: 0 30px 80px rgba(0,0,0,.6), 0 0 0 1px var(--edge); }
+
+  .panel {
+    width: 380px; max-width: 100%;
+    background: color-mix(in srgb, var(--panel) 92%, transparent);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+    backdrop-filter: blur(24px) saturate(150%);
+    border: 1px solid var(--edge);
+    border-radius: 14px;
+    padding: 10px;
+    display: flex; flex-direction: column; gap: 9px;
+  }
+
+  /* The captured text, drawn as what it is: something you highlighted. */
+  .source {
+    display: none;
+    border-left: 2px solid var(--mark);
+    background: var(--mark-dim);
+    padding: 7px 9px;
+    border-radius: 0 6px 6px 0;
+    font-size: 12.5px; line-height: 1.45;
+    color: #F0E9CE;
+    max-height: 66px; overflow: hidden;
+    position: relative; user-select: text;
+  }
+  .source.on { display: block; }
+  .source::after {
+    content: ""; position: absolute; inset: auto 0 0 0; height: 18px;
+    background: linear-gradient(transparent, #1F1F1C); opacity: .9;
+  }
+
+  .chips { display: flex; gap: 5px; }
+  .chip {
+    flex: 1; font: inherit; font-size: 12px; font-weight: 500; letter-spacing: -.01em;
+    color: var(--dim); background: var(--raised);
+    border: 1px solid transparent; border-radius: 8px;
+    padding: 6px 0; cursor: pointer;
+    transition: color .12s, background .12s;
+  }
+  .chip:hover { color: var(--text); background: #262B35; }
+  .chip[aria-pressed="true"] { color: #14161B; background: var(--mark); font-weight: 600; }
+  .chip:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; }
+
+  .ask {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--raised); border: 1px solid var(--edge);
+    border-radius: 10px; padding: 0 10px;
+  }
+  .ask:focus-within { border-color: var(--edge-lit); }
+  .bead { width: 9px; height: 9px; border-radius: 50%; background: var(--mark); flex: none; }
+  .bead.busy { animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { transform: scale(.55); opacity: .5; } }
+
+  #ask {
+    flex: 1; font: inherit; font-size: 13.5px; color: var(--text);
+    background: none; border: 0; padding: 9px 0; user-select: text;
+  }
+  #ask::placeholder { color: var(--faint); }
+  #ask:focus { outline: none; }
+
+  select {
+    font: inherit; font-size: 11.5px; color: var(--dim);
+    background: none; border: 0; padding: 2px; cursor: pointer;
+  }
+  select:focus { outline: none; color: var(--text); }
+  select option { background: var(--panel); color: var(--text); }
+
+  .out {
+    display: none; font-size: 13.5px; line-height: 1.55; white-space: pre-wrap;
+    padding: 2px 2px 0; max-height: 320px; overflow-y: auto;
+    user-select: text; cursor: text;
+  }
+  .out.on { display: block; }
+  .out:empty::before {
+    content: ""; display: block; height: 13px; width: 100%;
+    background: linear-gradient(90deg, var(--mark-dim) 0 40%, transparent 40%);
+    background-size: 250% 100%;
+    animation: sweep 1.1s linear infinite; border-radius: 2px;
+  }
+  @keyframes sweep { to { background-position: -250% 0; } }
+  .out::-webkit-scrollbar { width: 8px; }
+  .out::-webkit-scrollbar-thumb { background: #333944; border-radius: 4px; }
+
+  .foot {
+    display: none; align-items: center; gap: 6px;
+    padding-top: 2px; border-top: 1px solid var(--edge); margin-top: 2px;
+  }
+  .foot.on { display: flex; }
+  .model { font-size: 11px; color: var(--faint); margin-right: auto; padding-left: 2px; }
+  .act {
+    font: inherit; font-size: 11.5px; font-weight: 500;
+    color: var(--dim); background: none; border: 0;
+    padding: 5px 8px; border-radius: 6px; cursor: pointer;
+  }
+  .act:hover { color: var(--text); background: var(--raised); }
+  .act:focus-visible { outline: 2px solid var(--mark); outline-offset: -2px; }
+
+  .err { color: #FF9A8B; font-size: 12.5px; line-height: 1.5; }
+  .err code { color: var(--mark); font-size: 12px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="panel">
+  <div class="source" id="source"></div>
+
+  <div class="chips" role="group" aria-label="Actions">
+    <button class="chip" data-mode="translate" aria-pressed="false">Translate</button>
+    <button class="chip" data-mode="reply"     aria-pressed="false">Reply</button>
+    <button class="chip" data-mode="polish"    aria-pressed="false">Polish</button>
+    <button class="chip" data-mode="explain"   aria-pressed="false">Explain</button>
+  </div>
+
+  <div class="ask">
+    <span class="bead" id="bead"></span>
+    <input id="ask" autocomplete="off" spellcheck="false" placeholder="Ask anything about this…" />
+    <select id="lang" hidden aria-label="Translate into">
+      <option>English</option><option>Spanish</option><option>Catalan</option>
+      <option>German</option><option>French</option><option>Italian</option>
+      <option>Portuguese</option><option>Dutch</option><option>Japanese</option>
+      <option>Chinese</option><option>Arabic</option>
+    </select>
+  </div>
+
+  <div class="out" id="out"></div>
+
+  <div class="foot" id="foot">
+    <span class="model" id="model"></span>
+    <button class="act" id="copy">Copy</button>
+    <button class="act" id="replace">Replace selection</button>
+  </div>
+</div>
+
+<script type="module">
+const T = window.__TAURI__;
+const invoke = T?.core?.invoke;
+const listen = T?.event?.listen;
+
+const $ = (id) => document.getElementById(id);
+const els = {
+  source: $("source"), out: $("out"), foot: $("foot"),
+  ask: $("ask"), bead: $("bead"), lang: $("lang"), model: $("model"),
+};
+
+let selection = "";
+let mode = null;
+let busy = false;
+let settings = null;
+
+/* ---------------------------------------------------------------
+   Prompts. Adding an action = one button above, one entry here.
+   --------------------------------------------------------------- */
+const MODES = {
+  translate: {
+    lang: true,
+    system: (o) =>
+      `You are a translator. Output ONLY the translation into ${o.lang} — no preamble, ` +
+      `no quotes, no notes, no explanation. Preserve the register, tone, line breaks and ` +
+      `formatting of the original. If the text is already in ${o.lang}, output it unchanged.`,
+    user: (text) => text,
+  },
+  reply: {
+    system: () =>
+      `You draft replies to messages. Output ONLY the reply body, ready to send. ` +
+      `Match the language, tone and formality of the message being answered. Be brief — ` +
+      `three short paragraphs at most. No subject line, no signature, and no placeholders ` +
+      `like [Name] unless the name is genuinely unknowable from the message.`,
+    user: (text, o) =>
+      `Message received:\n\n${text}` +
+      (o.note ? `\n\nWhat I want to convey in reply: ${o.note}` : ``),
+  },
+  polish: {
+    system: () =>
+      `You rewrite text so it reads better. Output ONLY the rewritten text. Keep the ` +
+      `author's voice and language. Fix grammar and awkward phrasing. Do not add ideas, ` +
+      `do not pad, and do not make it longer than the original.`,
+    user: (text, o) => (o.note ? `Instruction: ${o.note}\n\n${text}` : text),
+  },
+  explain: {
+    system: () =>
+      `You explain things plainly, in the language of the text. Assume a smart reader who ` +
+      `lacks the specific context. Four sentences at most. No preamble.`,
+    user: (text, o) => (o.note ? `${text}\n\nSpecifically: ${o.note}` : text),
+  },
+  ask: {
+    system: () =>
+      `You are a fast desktop assistant. Answer directly and briefly, in the user's ` +
+      `language. No preamble, no sign-off.`,
+    user: (text, o) => (text ? `Context:\n${text}\n\n${o.note}` : o.note),
+  },
+};
+
+function setBusy(on) { busy = on; els.bead.classList.toggle("busy", on); }
+
+/* ---------------------------------------------------------------
+   Auto-close. The panel opens unfocused so it never steals your
+   keyboard mid-sentence; the trade is that clicking elsewhere can't
+   dismiss it, because it was never focused to begin with. So it
+   times out — and any sign of interest cancels that.
+   --------------------------------------------------------------- */
+let closeTimer = null;
+
+function cancelAutoClose() { clearTimeout(closeTimer); closeTimer = null; }
+
+function armAutoClose(ms) {
+  cancelAutoClose();
+  closeTimer = setTimeout(() => invoke?.("dismiss_panel"), ms);
+}
+
+for (const evt of ["pointerdown", "keydown", "wheel", "focusin"])
+  document.addEventListener(evt, cancelAutoClose, { capture: true });
+
+async function go(m, opts = {}) {
+  if (busy) return;
+  const spec = MODES[m];
+  const o = { lang: els.lang.value, note: opts.note || "" };
+  const user = spec.user(selection, o);
+  if (!user?.trim()) return;
+
+  cancelAutoClose();
+  els.out.textContent = "";
+  els.out.classList.add("on");
+  els.foot.classList.remove("on");
+  setBusy(true);
+
+  try {
+    if (invoke) await invoke("ask_model", { system: spec.system(o), user });
+    else await mockStream();
+  } catch (e) { setBusy(false); fail(e); }
+}
+
+function fail(e) {
+  const msg = String(e?.message || e);
+  els.out.innerHTML = /ollama isn't running|connect|refused/i.test(msg)
+    ? `<span class="err">Ollama isn't answering. Start it with <code>ollama serve</code>.</span>`
+    : `<span class="err">${msg}</span>`;
+  els.foot.classList.remove("on");
+}
+
+function finish() { setBusy(false); els.foot.classList.add("on"); }
+
+function reset() {
+  els.out.classList.remove("on");
+  els.out.textContent = "";
+  els.foot.classList.remove("on");
+  els.ask.value = "";
+  setMode(null);
+}
+
+function setMode(m) {
+  mode = m;
+  for (const c of document.querySelectorAll(".chip"))
+    c.setAttribute("aria-pressed", String(c.dataset.mode === m));
+  els.lang.hidden = !(m && MODES[m].lang);
+  els.ask.placeholder = {
+    translate: "Anything to add?",
+    reply: "What do you want to say back?",
+    polish: "Any direction? (optional)",
+    explain: "Anything specific?",
+  }[m] || "Ask anything about this…";
+}
+
+function load(text) {
+  selection = text || "";
+  els.source.textContent = selection;
+  els.source.classList.toggle("on", !!selection);
+  reset();
+  els.ask.focus();
+}
+
+/* ---- wiring ----
+   The panel opens unfocused (see auto_open_focus). On macOS the very first
+   click into an unfocused window is swallowed as pure window activation —
+   "click" never fires, only the second click does. "pointerdown" isn't
+   swallowed, so we act on that instead and keep "click" out of it entirely
+   to avoid firing twice once the window is focused. Enter/Space still work
+   because keyboard activation of a button never goes through pointerdown. */
+function onActivate(el, fn) {
+  el.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    fn();
+  });
+  el.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fn();
+    }
+  });
+}
+
+for (const c of document.querySelectorAll(".chip")) {
+  onActivate(c, () => {
+    setMode(c.dataset.mode);
+    go(c.dataset.mode, { note: els.ask.value.trim() });
+  });
+}
+
+els.lang.addEventListener("change", () => {
+  if (settings && invoke) {
+    settings.target_language = els.lang.value;
+    invoke("save_settings", { next: settings });
+  }
+  if (mode === "translate") go("translate");
+});
+
+els.ask.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  const note = els.ask.value.trim();
+  if (mode) go(mode, { note });
+  else if (note) go("ask", { note });
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") invoke ? invoke("dismiss_panel") : reset();
+});
+
+onActivate($("copy"), async () => {
+  await navigator.clipboard.writeText(els.out.textContent);
+  flash($("copy"), "Copied");
+});
+
+onActivate($("replace"), () => {
+  if (invoke) invoke("replace_selection", { text: els.out.textContent });
+  else flash($("replace"), "Pasted");
+});
+
+function flash(btn, word) {
+  const old = btn.textContent;
+  btn.textContent = word;
+  setTimeout(() => (btn.textContent = old), 1100);
+}
+
+/* ---- app mode ---- */
+if (T) {
+  listen("token", (e) => { els.out.textContent += e.payload; els.out.scrollTop = 1e6; });
+  listen("done", finish);
+  listen("error", (e) => { setBusy(false); fail(e.payload); });
+  listen("summoned", (e) => {
+    const p = e.payload;
+    load(typeof p === "string" ? p : p.text);
+    // A panel that opened on its own, and that you then ignore, should take
+    // itself away again.
+    if (p && p.auto) armAutoClose(p.closeAfter ?? 14000);
+    else cancelAutoClose();
+  });
+
+  invoke("get_settings").then((s) => {
+    settings = s;
+    els.model.textContent = s.model;
+    els.lang.value = s.target_language;
+  });
+  invoke("held_text").then(load);
+}
+
+/* ---- browser preview ---- */
+if (!T) {
+  document.body.classList.add("preview");
+  els.model.textContent = "gemma3:4b";
+  load(
+    "Hola Marc, gracias por el borrador. Creo que el plazo del viernes es demasiado " +
+    "ajustado; ¿podríamos movernos al martes siguiente?"
+  );
+}
+
+async function mockStream() {
+  const canned = {
+    translate: "Hi Marc, thanks for the draft. I think Friday's deadline is too tight — could we move it to the following Tuesday?",
+    reply: "Hi Marc,\n\nNo problem at all — Tuesday works on my side. I'll send over my comments on the draft before then so you have everything in one go.\n\nThanks for flagging it early.",
+    polish: "Hi Marc — thanks for the draft. Friday feels tight to me. Could we push to the following Tuesday?",
+    explain: "Marc has been sent a draft and is pushing back on the timeline. He finds Friday too tight and proposes the following Tuesday instead. It's a request, not a decision — he's waiting on your answer.",
+    ask: "It reads as polite but slightly formal. Marc is asking rather than telling — the question mark leaves the decision with you.",
+  }[mode || "ask"];
+
+  for (const word of canned.split(/(\s+)/)) {
+    await new Promise((r) => setTimeout(r, 22));
+    els.out.textContent += word;
+    els.out.scrollTop = 1e6;
+  }
+  finish();
+}
+</script>
+</body>
+</html>

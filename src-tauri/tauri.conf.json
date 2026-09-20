@@ -1,0 +1,83 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "clicky",
+  "version": "0.1.0",
+  "identifier": "foo.clicky.desktop",
+  "build": {
+    "frontendDist": "../src"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "withGlobalTauri": true,
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    },
+    "windows": [
+      {
+        "label": "panel",
+        "url": "index.html",
+        "title": "clicky",
+        "width": 400,
+        "height": 460,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "center": false,
+        "focus": true,
+        "acceptFirstMouse": true
+      },
+      {
+        "label": "bead",
+        "url": "bead.html",
+        "title": "clicky bead",
+        "width": 40,
+        "height": 40,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "focus": false,
+        "acceptFirstMouse": true
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "dmg",
+      "app",
+      "msi",
+      "nsis",
+      "appimage",
+      "deb"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Productivity",
+    "shortDescription": "Local text helper that follows your cursor",
+    "longDescription": "clicky watches for text you highlight anywhere on your machine and offers to translate it, reply to it, rewrite it or explain it. Everything runs locally through Ollama.",
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    },
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libxdo3"
+        ]
+      }
+    }
+  }
+}

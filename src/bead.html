@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>clicky bead</title>
+<style>
+  html, body {
+    margin: 0; width: 100%; height: 100%;
+    background: transparent;
+    overflow: hidden;
+    user-select: none;
+    cursor: default;
+  }
+  #bead {
+    position: absolute;
+    top: 50%; left: 50%;
+    /* Rotated so the tip points back up toward the cursor it trails behind. */
+    transform: translate(-50%, -50%) rotate(-40deg);
+    width: 10px; height: 10px;
+    transition: width .18s cubic-bezier(.2,.9,.3,1.2),
+                height .18s cubic-bezier(.2,.9,.3,1.2);
+    display: grid;
+    place-items: center;
+  }
+  /* Stack the svg and the mark in the same cell instead of auto-flowing them
+     into separate rows. */
+  #bead > * { grid-area: 1 / 1; }
+  /* SVG rather than clip-path/border-radius: a shape's box-shadow and hollow
+     ring don't render cleanly through clip-path in WKWebView. Full opacity
+     always — the gradient and highlight carry the "glass" look, so we don't
+     also need to fade the whole thing down while idle. */
+  #bead svg { width: 100%; height: 100%; display: block;
+    filter: drop-shadow(0 2px 4px rgba(10,40,90,.5)); }
+  body.offer #bead { width: 26px; height: 26px; cursor: pointer; }
+  body.offer #bead svg { filter: drop-shadow(0 3px 9px rgba(10,40,90,.6)); }
+  body.offer #bead:hover { width: 30px; height: 30px; }
+
+  /* One ring, once. Not a beacon. */
+  #ring {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 26px; height: 26px;
+    margin: -13px 0 0 -13px;
+    transform: rotate(-40deg);
+    opacity: 0;
+    pointer-events: none;
+  }
+  #ring svg { width: 100%; height: 100%; }
+  #ring polygon { fill: none; stroke: #2E7BEE; stroke-width: 5; }
+  body.offer #ring { animation: ping .7s ease-out 1; }
+  @keyframes ping {
+    from { opacity: .7; transform: rotate(-40deg) scale(.6); }
+    to   { opacity: 0;   transform: rotate(-40deg) scale(2.1); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+  <div id="ring">
+    <svg viewBox="0 0 100 100"><polygon points="50,6 92,90 50,66 8,90" /></svg>
+  </div>
+  <div id="bead" title="clicky">
+    <svg viewBox="0 0 100 100">
+      <defs>
+        <linearGradient id="glass" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#8FC7FF" />
+          <stop offset="55%" stop-color="#2E7BEE" />
+          <stop offset="100%" stop-color="#1653C7" />
+        </linearGradient>
+      </defs>
+      <polygon points="50,6 92,90 50,66 8,90" fill="url(#glass)" />
+      <polygon points="50,10 71,52 50,42 33,52" fill="#fff" opacity=".35" />
+    </svg>
+  </div>
+
+<script type="module">
+const invoke = window.__TAURI__?.core?.invoke;
+const listen = window.__TAURI__?.event?.listen;
+
+let pending = "";
+let timer = null;
+
+function idle() {
+  pending = "";
+  document.body.classList.remove("offer");
+  invoke?.("bead_clickthrough", { on: true });
+  clearTimeout(timer);
+}
+
+function offer(text) {
+  pending = text;
+  document.body.classList.add("offer");
+  invoke?.("bead_clickthrough", { on: false });
+
+  // An offer you ignore should go away on its own. Nothing is more annoying
+  // than a permanently lit badge.
+  clearTimeout(timer);
+  timer = setTimeout(idle, 9000);
+}
+
+document.getElementById("bead").addEventListener("click", () => {
+  if (!pending) return;
+  invoke?.("open_panel", { text: pending });
+  idle();
+});
+
+listen?.("offer", (e) => offer(e.payload));
+listen?.("offer-cleared", idle);
+// If the panel opened by itself, the bead has nothing left to announce.
+listen?.("summoned", idle);
+
+idle();
+</script>
+</body>
+</html>

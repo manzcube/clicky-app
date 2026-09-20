@@ -1,0 +1,6 @@
+/src-tauri/target/
+/src-tauri/gen/
+/dist/
+.DS_Store
+*.log
+.claude/
