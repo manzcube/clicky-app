@@ -241,4 +241,20 @@ This is version 0.1. Honestly:
 
 ---
 
+## Credits
+
+The "AI buddy that lives next to your cursor" idea comes from
+[farzaa/clicky](https://github.com/farzaa/clicky), a macOS menu-bar app that
+uses voice and screen-capture with cloud AI (Claude, AssemblyAI, ElevenLabs).
+A few community forks — including the one behind clicky.foo — ported the
+concept to Windows, running offline through Ollama.
+
+This clicky is an independent Rust/Tauri implementation with different
+mechanics: it acts on text you've highlighted rather than what it sees or
+hears, and everything runs local-only through Ollama. No code shared with
+the original — not affiliated with or endorsed by it, just the same idea
+built a different way.
+
+---
+
 MIT. Do what you like with it.
