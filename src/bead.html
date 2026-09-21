@@ -60,28 +60,38 @@
 </head>
 <body>
   <div id="ring">
-    <svg viewBox="0 0 100 100"><polygon points="50,14 84,86 50,62 16,86" /></svg>
+    <svg viewBox="0 0 100 100"><polygon points="50,20 78,82 50,58 22,82" /></svg>
   </div>
   <div id="bead" title="clicky">
     <svg viewBox="0 0 100 100">
       <defs>
-        <linearGradient id="glass" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#BFE0FF" />
-          <stop offset="55%" stop-color="#5B9EF2" />
-          <stop offset="100%" stop-color="#2A66D6" />
+        <linearGradient id="glass" x1="10%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#E4F3FF" />
+          <stop offset="50%" stop-color="#82B9F3" />
+          <stop offset="100%" stop-color="#4079D8" />
         </linearGradient>
+        <!-- Glass has thickness — darken toward the trailing edge instead of
+             leaving the tint perfectly flat. -->
+        <linearGradient id="edge" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="60%" stop-color="#0A2A6B" stop-opacity="0" />
+          <stop offset="100%" stop-color="#0A2A6B" stop-opacity=".35" />
+        </linearGradient>
+        <filter id="soften"><feGaussianBlur stdDeviation="5" /></filter>
       </defs>
       <!-- The fill polygon is sharp-cornered; a stroke of the same fill,
            thick with round joins, is what actually rounds it off — cheaper
            and crisper than trying to hand-author rounded polygon points. -->
-      <polygon points="50,14 84,86 50,62 16,86" fill="url(#glass)" fill-opacity=".68"
-        stroke="url(#glass)" stroke-opacity=".68" stroke-width="18"
+      <polygon points="50,20 78,82 50,58 22,82" fill="url(#glass)" fill-opacity=".38"
+        stroke="url(#glass)" stroke-opacity=".38" stroke-width="30"
+        stroke-linejoin="round" stroke-linecap="round" />
+      <polygon points="50,20 78,82 50,58 22,82" fill="url(#edge)" fill-opacity=".5"
+        stroke="url(#edge)" stroke-opacity=".5" stroke-width="30"
         stroke-linejoin="round" stroke-linecap="round" />
       <!-- Rim light: glass catches an edge highlight. -->
-      <polygon points="50,14 84,86 50,62 16,86" fill="none"
-        stroke="rgba(255,255,255,.6)" stroke-width="2.5"
+      <polygon points="50,20 78,82 50,58 22,82" fill="none"
+        stroke="rgba(255,255,255,.8)" stroke-width="2.5"
         stroke-linejoin="round" stroke-linecap="round" />
-      <polygon points="50,18 66,48 50,40 37,48" fill="#fff" opacity=".45" />
+      <polygon points="50,24 64,48 50,42 39,48" fill="#fff" opacity=".65" filter="url(#soften)" />
     </svg>
   </div>
 
