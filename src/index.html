@@ -39,9 +39,21 @@
     backdrop-filter: blur(24px) saturate(150%);
     border: 1px solid var(--edge);
     border-radius: 14px;
-    padding: 10px;
+    padding: 28px 10px 10px;
     display: flex; flex-direction: column; gap: 9px;
+    position: relative;
   }
+
+  .close {
+    position: absolute; top: 6px; right: 6px;
+    width: 22px; height: 22px; padding: 0;
+    display: grid; place-items: center;
+    font: inherit; font-size: 15px; line-height: 1;
+    color: var(--dim); background: none; border: 0; border-radius: 6px;
+    cursor: pointer;
+  }
+  .close:hover { color: var(--text); background: var(--raised); }
+  .close:focus-visible { outline: 2px solid var(--mark); outline-offset: 1px; }
 
   /* The captured text, drawn as what it is: something you highlighted. */
   .source {
@@ -157,6 +169,8 @@
 <body>
 
 <div class="panel">
+  <button class="close" id="close" aria-label="Close" title="Close (Esc)">&times;</button>
+
   <!-- Shown instead of everything below until Ollama is actually reachable
        and the configured model is pulled. A user with nothing installed
        yet should get a next step, not a silent, confusing failure the
@@ -388,6 +402,8 @@ els.ask.addEventListener("keydown", (e) => {
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") invoke ? invoke("dismiss_panel") : reset();
 });
+
+onActivate($("close"), () => (invoke ? invoke("dismiss_panel") : reset()));
 
 onActivate($("copy"), async () => {
   await navigator.clipboard.writeText(els.out.textContent);
